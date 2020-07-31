@@ -1,0 +1,15 @@
+[app]
+name="scapegoat"
+version="1.0.0"
+author="Ethan Shry"
+endpoint="https://github.com/ethanshry/scapegoat"
+
+[config]
+lang="python3"
+test=""
+run="python3 ./src/main.py"
+
+
+[env-vars]
+test-var="test-var content"
+
