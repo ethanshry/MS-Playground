@@ -8,7 +8,6 @@ use bollard::{
     service::{HostConfig, PortBinding},
     Docker,
 };
-use flate2::write::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use futures_util::stream::StreamExt;
@@ -17,7 +16,6 @@ use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
 use std::io::Read;
-use tar::Archive;
 use uuid::Uuid;
 
 pub mod docker_container;
@@ -46,6 +44,17 @@ impl DockerBroker {
         }
     }
 
+    /// Gets a list of existing docker images
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let docker = DockerBroker::new();
+    /// let ids = docker.get_image_ids();
+    /// for id in ids {
+    ///     println!("{:?}", id);
+    /// }
+    /// ```
     pub async fn get_image_ids(&self) -> Vec<String> {
         let images = self
             .conn
@@ -65,6 +74,17 @@ impl DockerBroker {
         ids
     }
 
+    /// Gets a list of running docker containers
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let docker = DockerBroker::new();
+    /// let containers = docker.get_running_containers();
+    /// for c in container {
+    ///     println!("{:?}", c);
+    /// }
+    /// ```
     pub async fn get_running_containers(&self) -> Vec<DockerContainer> {
         let cs = self
             .conn
@@ -103,6 +123,19 @@ impl DockerBroker {
         containers
     }
 
+    /// Builds a docker image from a local project folder
+    ///
+    /// This will create a `/tmp/containers` directory if it doesn't exist to store a tar of the project before building the image.
+    /// # Arguments
+    ///
+    /// * `source_path` - The path relative to the root of the crate which contains the desired image contents. A `Dockerfile` is expected to be in this folder.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let docker = DockerBroker::new();
+    /// docker.build_image("./tmp/test-proj"); // builds image 12345 and maps 9000->9000
+    /// ```
     pub async fn build_image(&self, source_path: &str) -> Result<DockerImageBuildResult, String> {
         let container_guid = Uuid::new_v4().to_hyphenated().to_string();
         // tar the directory
@@ -181,7 +214,20 @@ impl DockerBroker {
     }
 
     /// Both creates and starts a docker container
+    ///
+    /// # Arguments
+    ///
+    /// * `image_id` - The id of the image to turn into a container
+    /// * `port` - a port within the container which should be exposed. This will map the port to its corresponding port on the machine (i.e. 9000 -> 9000)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let docker = DockerBroker::new();
+    /// docker.start_container("12345", 9000); // builds image 12345 and maps 9000->9000
+    /// ```
     pub async fn start_container(&self, image_id: &str, port: i64) -> Result<String, ()> {
+        // TODO support exposing multiple ports? Check out TCP vs UDP?
         let mut ports = HashMap::new();
 
         let p = format!("{}/tcp", port);
@@ -236,17 +282,22 @@ impl DockerBroker {
         Err(())
     }
 
+    /// Stops a docker container
+    ///
+    /// # Arguments
+    ///
+    /// * `container_id` - The id of the container to kill
     pub async fn stop_container(&self, container_id: &str) -> () {
         self.conn
             .stop_container(container_id, Some(StopContainerOptions { t: 10 }))
             .await
             .unwrap();
+        info!("Killing docker container {}", container_id);
         ()
     }
 
-    pub async fn get_container_stats(&self, container_id: &str) -> () {
-        // TODO container stats
-    }
+    // TODO figure out what stats are actually useful
+    pub async fn get_container_stats(&self, container_id: &str) -> () {}
 
     /// Remove unused images from docker
     ///

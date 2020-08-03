@@ -1,9 +1,4 @@
-#[macro_use]
-extern crate log;
-
 pub mod docker;
-
-use ::tokio::stream::*;
 use bollard::image::ListImagesOptions;
 use bollard::{
     container::{ListContainersOptions, StatsOptions},
@@ -12,7 +7,7 @@ use bollard::{
 use docker::DockerBroker;
 use dotenv;
 use futures_util::stream::*;
-use log::{error, info};
+use log::info;
 
 #[tokio::main]
 async fn main() -> Result<(), ()> {
@@ -122,7 +117,7 @@ async fn main() -> Result<(), ()> {
     .await;
 
     // Start a container
-    async move {
+    async {
         let docker = DockerBroker::new().await;
         if let Some(docker) = docker {
             let ids = docker.start_container(&image_id, 9000).await;
@@ -130,6 +125,17 @@ async fn main() -> Result<(), ()> {
             if let Ok(id) = ids {
                 info!("Spawned {}", id);
             }
+        }
+    }
+    .await;
+
+    std::thread::sleep(std::time::Duration::new(15, 0));
+
+    // kill the started container
+    async move {
+        let docker = DockerBroker::new().await;
+        if let Some(docker) = docker {
+            docker.stop_container(&image_id).await;
         }
     }
     .await;
